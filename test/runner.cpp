@@ -8,7 +8,7 @@ class TestRunner
 {
     unsigned int successes = 0;
     unsigned int total_tests = 0;
-    const std::vector<TestCase>& test_cases = registry();
+    const std::vector<TestCase>& test_cases;
 
     struct IncreaseTotal
     {
@@ -24,23 +24,59 @@ class TestRunner
     template <typename T>
     static void report_failure(const TestCase& test_case, const T& message)
     {
-        std::cerr << "Test " << test_case.name << " at " << test_case.file.native() << ":" << test_case.line <<
-            " failed: "
-            << message << std::endl;
+        if (!test_case.extras.is_should_panic())
+        {
+            std::cerr << "... FAIL [" << message << "]" << std::endl;
+            return;
+        }
+
+        const auto expected_message = std::get_if<std::string_view>(&test_case.extras.should_panic);
+        if (!expected_message)
+        {
+            std::cerr << "... OK [panicked]" << std::endl;
+            return;
+        }
+
+        if (*expected_message != std::string_view{message})
+        {
+            std::cerr
+                << "... FAIL [" << message
+                << "], but expected different panic message: " << *expected_message << std::endl;
+            return;
+        }
+        std::cerr << "... OK [panicked]" << std::endl;
     }
 
 public:
-    void run_test(const TestCase& test_case)
+    bool fail_fast = false;
+
+    enum class Outcome
+    {
+        Succeeded, Skipped, Failed
+    };
+
+    explicit TestRunner(const bool fail_fast = false, const std::vector<TestCase>& test_cases = registry())
+        : fail_fast(fail_fast),
+          test_cases(test_cases)
+    {
+    }
+
+    Outcome run_test(const TestCase& test_case)
     {
         using namespace std::chrono;
 
         const IncreaseTotal _{this->total_tests};
         std::cerr << "Running test " << test_case.name;
 
-        if (test_case.extras.ignored)
+        if (std::holds_alternative<bool>(test_case.extras.ignored) && std::get<bool>(test_case.extras.ignored))
         {
-            std::cerr << "... skipped" << std::endl;
-            return;
+            std::cerr << "... SKIP" << std::endl;
+            return Outcome::Skipped;
+        }
+        if (std::holds_alternative<std::string_view>(test_case.extras.ignored))
+        {
+            std::cerr << "... SKIP (" << std::get<std::string_view>(test_case.extras.ignored) << ")" << std::endl;
+            return Outcome::Skipped;
         }
 
         const auto now = high_resolution_clock::now();
@@ -52,22 +88,24 @@ public:
         }
         catch (const char* ex)
         {
-            if (!test_case.extras.should_panic) report_failure(test_case, ex);
-            else std::cerr << "... OK [panicked]" << std::endl;
+            report_failure(test_case, ex);
+            return Outcome::Failed;
         }
         catch (const std::exception& ex)
         {
-            if (!test_case.extras.should_panic) report_failure(test_case, ex.what());
-            else std::cerr << "... OK [panicked]" << std::endl;
+            report_failure(test_case, ex.what());
+            return Outcome::Failed;
         }
         this->successes++;
+        return Outcome::Succeeded;
     }
 
     void run_all()
     {
         for (const auto& test : this->test_cases)
         {
-            run_test(test);
+            const auto outcome = run_test(test);
+            if (this->fail_fast && outcome == Outcome::Failed) return;
         }
     }
 
@@ -92,19 +130,20 @@ public:
         {
             os << " - " << test.name;
 
-            std::vector<std::string_view> properties {};
-            if (test.extras.ignored) properties.emplace_back("ignored");
-            if (test.extras.should_panic) properties.emplace_back("should panic");
+            std::vector<std::string_view> properties{};
+            if (test.extras.is_ignored()) properties.emplace_back("ignored");
+            if (test.extras.is_should_panic()) properties.emplace_back("should panic");
             if (!properties.empty())
             {
                 bool first = true;
-                for (const auto& property: properties)
+                for (const auto& property : properties)
                 {
                     if (first)
                     {
                         first = false;
                         os << " [" << property;
-                    } else
+                    }
+                    else
                     {
                         os << ", " << property;
                     }
@@ -118,6 +157,14 @@ public:
     }
 };
 
+static bool flag_passed(const int argc, char** argv, const std::string_view flag)
+{
+    for (int i = 0; i < argc; i++)
+        if (flag == argv[i])
+            return true;
+    return false;
+}
+
 int main(const int argc, char* argv[])
 {
     TestRunner runner;
@@ -128,11 +175,8 @@ int main(const int argc, char* argv[])
     }
 
     const std::string_view arg{argv[1]};
-    bool exact = false;
-    if (argc > 2)
-    {
-        exact = std::string_view{argv[2]} == "--exact";
-    }
+    const bool exact = flag_passed(argc - 2, argv + 2, "--exact");
+    runner.fail_fast = flag_passed(argc - 2, argv + 2, "--fail-fast");
 
     if (arg == "--all")
     {
