@@ -10,6 +10,11 @@ TEST(i_am_failing_but_expect_that, .should_panic = true)
     throw "BOOM";
 }
 
+TEST(i_am_failing_with_cpp_exception, .should_panic = true)
+{
+    throw std::runtime_error{"BOOM"};
+}
+
 TEST(i_am_ignored, .ignored = true)
 {
     throw "BOOM";
