@@ -18,4 +18,4 @@ using f64 = double;
 using usize = std::uintptr_t;
 using isize = std::intptr_t;
 
-#endif //OROGRAPH_PLATFORM_H
+#endif // OROGRAPH_PLATFORM_H

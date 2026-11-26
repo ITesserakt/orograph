@@ -5,4 +5,4 @@
 
 u32 add(u32 a, u32 b);
 
-#endif //OROGRAPH_LIB_H
+#endif // OROGRAPH_LIB_H
