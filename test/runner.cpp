@@ -17,30 +17,31 @@ class TestRunner {
         ~IncreaseTotal() { total++; }
     };
 
-    template <typename T> static void report_failure(const TestCase& test_case, const T& message) {
+    template <typename T> static bool report_failure(const TestCase& test_case, const T& message) {
         if (!test_case.extras.is_should_panic()) {
             std::cerr << "... FAIL [" << message << "]" << std::endl;
-            return;
+            return false;
         }
 
         const auto expected_message = std::get_if<std::string_view>(&test_case.extras.should_panic);
         if (!expected_message) {
             std::cerr << "... OK [panicked]" << std::endl;
-            return;
+            return true;
         }
 
         if (*expected_message != std::string_view{message}) {
             std::cerr << "... FAIL [" << message << "], but expected different panic message: " << *expected_message
                       << std::endl;
-            return;
+            return false;
         }
         std::cerr << "... OK [panicked]" << std::endl;
+        return true;
     }
 
   public:
     bool fail_fast = false;
 
-    enum class Outcome { Succeeded, Skipped, Failed };
+    enum class Outcome { Succeeded, Failed };
 
     explicit TestRunner(const bool fail_fast = false, const std::vector<TestCase>& test_cases = registry())
         : test_cases(test_cases), fail_fast(fail_fast) {}
@@ -53,11 +54,13 @@ class TestRunner {
 
         if (std::holds_alternative<bool>(test_case.extras.ignored) && std::get<bool>(test_case.extras.ignored)) {
             std::cerr << "... SKIP" << std::endl;
-            return Outcome::Skipped;
+            this->successes++;
+            return Outcome::Succeeded;
         }
         if (std::holds_alternative<std::string_view>(test_case.extras.ignored)) {
             std::cerr << "... SKIP (" << std::get<std::string_view>(test_case.extras.ignored) << ")" << std::endl;
-            return Outcome::Skipped;
+            this->successes++;
+            return Outcome::Succeeded;
         }
 
         const auto now = high_resolution_clock::now();
@@ -66,22 +69,33 @@ class TestRunner {
             const auto elapsed = high_resolution_clock::now();
             std::cerr << "... OK [" << duration_cast<milliseconds>(elapsed - now) << "]" << std::endl;
         } catch (const char* ex) {
-            report_failure(test_case, ex);
+            if (report_failure(test_case, ex))
+                return Outcome::Succeeded;
             return Outcome::Failed;
         } catch (const std::exception& ex) {
-            report_failure(test_case, ex.what());
+            if (report_failure(test_case, ex.what()))
+                return Outcome::Succeeded;
             return Outcome::Failed;
         }
         this->successes++;
         return Outcome::Succeeded;
     }
 
-    void run_all() {
+    Outcome run_all() {
+        auto global_outcome = Outcome::Succeeded;
         for (const auto& test : this->test_cases) {
-            const auto outcome = run_test(test);
-            if (this->fail_fast && outcome == Outcome::Failed)
-                return;
+            const auto local_outcome = run_test(test);
+            if (this->fail_fast && local_outcome == Outcome::Failed)
+                return Outcome::Failed;
+            switch (local_outcome) {
+            case Outcome::Succeeded:
+                break;
+            case Outcome::Failed:
+                global_outcome = Outcome::Failed;
+                break;
+            }
         }
+        return global_outcome;
     }
 
     [[nodiscard]] const TestCase* get_test_by_name(const std::string_view& name, const bool exact = false) const {
@@ -142,14 +156,19 @@ int main(const int argc, char* argv[]) {
     const bool exact = flag_passed(argc - 2, argv + 2, "--exact");
     runner.fail_fast = flag_passed(argc - 2, argv + 2, "--fail-fast");
 
+    auto outcome = TestRunner::Outcome::Succeeded;
     if (arg == "--all") {
-        runner.run_all();
+        outcome = runner.run_all();
     } else if (const auto test = runner.get_test_by_name(arg, exact)) {
-        runner.run_test(*test);
+        outcome = runner.run_test(*test);
     } else {
         std::cerr << "Test not found: " << arg << std::endl;
     }
 
-    std::cerr << "Finished with " << runner.successive_runs() << " / " << runner.total_runs() << " success"
-              << std::endl;
+    switch (outcome) {
+    case TestRunner::Outcome::Succeeded:
+        return 0;
+    case TestRunner::Outcome::Failed:
+        return static_cast<int>(runner.total_runs() - runner.successive_runs());
+    }
 }
