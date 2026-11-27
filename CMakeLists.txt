@@ -4,6 +4,8 @@ project(orograph LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 enable_testing()
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
+
 include(cmake/EnableIPOSupport.cmake)
 include(cmake/StaticAnalyzers.cmake)
 

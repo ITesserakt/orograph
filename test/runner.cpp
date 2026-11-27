@@ -100,7 +100,7 @@ class TestRunner {
 
     [[nodiscard]] const TestCase* get_test_by_name(const std::string_view& name, const bool exact = false) const {
         for (const auto& test : this->test_cases) {
-            if (exact && test.name == name || !exact && test.name.find(name) != std::string::npos) {
+            if ((exact && test.name == name) || (!exact && test.name.find(name) != std::string::npos)) {
                 return &test;
             }
         }
