@@ -2,8 +2,6 @@
 #define OROGRAPH_SAMPLE_H
 
 /// This abstract class represents a sample of the domain space
-struct Sample {
-
-};
+struct Sample {};
 
 #endif // OROGRAPH_SAMPLE_H

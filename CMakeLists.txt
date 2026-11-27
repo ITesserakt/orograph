@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 4.4)
 
 project(orograph VERSION 0.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
@@ -16,9 +16,7 @@ find_package(Eigen3 5.0...6.0 REQUIRED)
 
 add_subdirectory(lib/orograph-internal)
 
-add_library(orograph
-        src/capi.cpp
-)
+add_library(orograph src/capi.cpp)
 generate_export_header(orograph
         EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/orograph_export.h"
 )
@@ -30,22 +28,27 @@ target_sources(orograph
         "include/orograph.h"
         "${CMAKE_CURRENT_BINARY_DIR}/orograph_export.h"
 )
-add_library(orograph::orograph ALIAS orograph)
 target_link_libraries(orograph PRIVATE $<BUILD_INTERFACE:orograph-internal>)
 set_target_properties(orograph PROPERTIES
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN ON
 )
-if(NOT BUILD_SHARED_LIBS)
+if (NOT BUILD_SHARED_LIBS)
     target_compile_definitions(orograph PUBLIC OROGRAPH_STATIC_DEFINE)
-endif()
+endif ()
 
 add_executable(orograph-test
         test/example.cpp
         test/runner.cpp
 )
 target_link_libraries(orograph-test PRIVATE orograph-internal)
-add_test(NAME orograph-all_tests COMMAND orograph-test --all)
+discover_tests(
+        COMMAND orograph-test
+        DISCOVERY_ARGS --list
+        DISCOVERY_MATCH "^ - ([A-Za-z0-9_]+)( \\[.*\\])?$"
+        TEST_NAME "${PROJECT_NAME}.\\1"
+        TEST_ARGS "\\1" "--exact"
+)
 
 install(TARGETS orograph
         EXPORT orographTargets
@@ -54,7 +57,6 @@ install(TARGETS orograph
 
 install(EXPORT orographTargets
         FILE orographTargets.cmake
-        NAMESPACE orograph::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/orograph
 )
 

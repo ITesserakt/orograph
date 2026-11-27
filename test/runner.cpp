@@ -153,6 +153,11 @@ int main(const int argc, char* argv[]) {
     }
 
     const std::string_view arg{argv[1]};
+    if (arg == "--list") {
+        std::cout << runner;
+        return 0;
+    }
+
     const bool exact = flag_passed(argc - 2, argv + 2, "--exact");
     runner.fail_fast = flag_passed(argc - 2, argv + 2, "--fail-fast");
 
