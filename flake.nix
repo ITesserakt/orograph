@@ -14,7 +14,7 @@
         src = ./.;
 
         nativeBuildInputs = with pkgs; [ cmake ];
-        buildInputs = with pkgs; [ eigen ];
+        buildInputs = with pkgs; [ eigen_5 ];
       };
 
       default = inputs.self.packages.${system}.orograph;
@@ -27,7 +27,7 @@
           gcc
           llvmPackages.clang-tools
           cppcheck
-          eigen
+          eigen_5
         ];
       };
     }) inputs.nixpkgs.legacyPackages;

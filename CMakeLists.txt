@@ -10,6 +10,8 @@ include(cmake/EnableIPOSupport.cmake)
 include(cmake/StaticAnalyzers.cmake)
 include(GNUInstallDirs)
 
+find_package(Eigen3 5.0...6.0 REQUIRED)
+
 add_library(orograph STATIC
         src/lib.cpp
 )
@@ -21,6 +23,7 @@ target_sources(orograph
         "include/lib.h"
         "include/platform.h"
 )
+target_link_libraries(orograph PRIVATE Eigen3::Eigen)
 
 add_executable(orograph-test
         test/example.cpp
