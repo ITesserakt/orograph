@@ -6,7 +6,7 @@ enable_testing()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20 -Wall -Wextra -Werror")
 
-include(cmake/EnableIPOSupport.cmake)
+#include(cmake/EnableIPOSupport.cmake)
 include(cmake/StaticAnalyzers.cmake)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
