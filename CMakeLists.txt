@@ -6,7 +6,7 @@ enable_testing()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20 -Wall -Wextra -Werror")
 
-#include(cmake/EnableIPOSupport.cmake)
+include(cmake/EnableIPOSupport.cmake)
 include(cmake/StaticAnalyzers.cmake)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
@@ -35,6 +35,8 @@ set_target_properties(orograph PROPERTIES
 )
 if (NOT BUILD_SHARED_LIBS)
     target_compile_definitions(orograph PUBLIC OROGRAPH_STATIC_DEFINE)
+    set_property(TARGET orograph PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
+    set_property(TARGET orograph-internal PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
 endif ()
 
 add_executable(orograph-test
