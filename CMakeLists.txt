@@ -9,27 +9,42 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20 -Wall -Wextra -Werror")
 include(cmake/EnableIPOSupport.cmake)
 include(cmake/StaticAnalyzers.cmake)
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+include(GenerateExportHeader)
 
 find_package(Eigen3 5.0...6.0 REQUIRED)
 
-add_library(orograph STATIC
-        src/lib.cpp
+add_subdirectory(lib/orograph-internal)
+
+add_library(orograph
+        src/capi.cpp
+)
+generate_export_header(orograph
+        EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/orograph_export.h"
 )
 target_sources(orograph
         PUBLIC
         FILE_SET HEADERS
-        BASE_DIRS "include"
+        BASE_DIRS "include" "${CMAKE_CURRENT_BINARY_DIR}"
         FILES
-        "include/lib.h"
-        "include/platform.h"
+        "include/orograph.h"
+        "${CMAKE_CURRENT_BINARY_DIR}/orograph_export.h"
 )
-target_link_libraries(orograph PRIVATE Eigen3::Eigen)
+add_library(orograph::orograph ALIAS orograph)
+target_link_libraries(orograph PRIVATE $<BUILD_INTERFACE:orograph-internal>)
+set_target_properties(orograph PROPERTIES
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN ON
+)
+if(NOT BUILD_SHARED_LIBS)
+    target_compile_definitions(orograph PUBLIC OROGRAPH_STATIC_DEFINE)
+endif()
 
 add_executable(orograph-test
         test/example.cpp
         test/runner.cpp
 )
-target_link_libraries(orograph-test PRIVATE orograph)
+target_link_libraries(orograph-test PRIVATE orograph-internal)
 add_test(NAME orograph-all_tests COMMAND orograph-test --all)
 
 install(TARGETS orograph
@@ -39,5 +54,23 @@ install(TARGETS orograph
 
 install(EXPORT orographTargets
         FILE orographTargets.cmake
+        NAMESPACE orograph::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/orograph
+)
+
+configure_package_config_file(
+        cmake/orographConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/orographConfig.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/orograph
+)
+write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/orographConfigVersion.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/orographConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/orographConfigVersion.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/orograph
 )
